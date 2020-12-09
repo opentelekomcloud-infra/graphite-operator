@@ -1,0 +1,11 @@
+---
+# Use the 'create api' subcommand to add watches to this file.
+- version: v1
+  group: database.otc.com
+  kind: Graphite
+  role: graphite
+  finalizer:
+    name: finalizer.database.otc.com
+    vars:
+      state: absent
+# +kubebuilder:scaffold:watch

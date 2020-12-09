@@ -1,0 +1,14 @@
+apiVersion: database.otc.com/v1
+kind: Graphite
+metadata:
+  name: graphite
+spec:
+  namespace: graphite
+  graphite_image: "graphiteapp/graphite-statsd:1.1.7-8"
+  graphite_service_account: deployer
+  graphite_ingress_host: graphite.apps.osinfra.eco.tsi-dev.otc-service.com
+  graphite_ingress_tls_letsencrypt_issuer: letsencrypt-staging
+  graphite_ingress_tls: true
+  graphite_ingress_tls_secret_name: graphite-cert
+  graphite_ingress_annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod

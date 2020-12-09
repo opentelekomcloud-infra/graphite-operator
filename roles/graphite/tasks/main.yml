@@ -1,0 +1,442 @@
+---
+# tasks file for Graphite
+#
+- name: Verify graphite ConfigMap
+  community.kubernetes.k8s_info:
+    kind: ConfigMap
+    api_version: v1
+    name: "{{ graphite_cm_name }}"
+    namespace: '{{ namespace }}'
+  register: graphite_cm_result_existing
+
+- name: Create default Graphite ConfigMap
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    force: "no"
+    namespace: "{{ namespace }}"
+    definition: 
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: "{{ graphite_cm_name }}"
+      data:
+        aggregation-rules.conf: "{{ lookup('template', 'aggregation-rules.conf.j2') }}"
+        blacklist.conf: "{{ lookup('template', 'blacklist.conf.j2') }}"
+        carbon.conf: "{{ lookup('template', 'carbon.conf.j2') }}"
+        carbon.amqp.conf: "{{ lookup('template', 'carbon.amqp.conf.j2') }}"
+        dashboard.conf: "{{ lookup('template', 'dashboard.conf.j2') }}"
+        go-carbon.conf: "{{ lookup('template', 'go-carbon.conf.j2') }}"
+        graphite.wsgi.example: "{{ lookup('template', 'graphite.wsgi.example.j2') }}"
+        graphTemplates.conf: "{{ lookup('template', 'graphTemplates.conf.j2') }}"
+        relay-rules.conf: "{{ lookup('template', 'relay-rules.conf.j2') }}"
+        rewrite-rules.conf: "{{ lookup('template', 'rewrite-rules.conf.j2') }}"
+        storage-aggregation.conf: "{{ lookup('template', 'storage-aggregation.conf.j2') }}"
+        storage-schemas.conf: "{{ lookup('template', 'storage-schemas.conf.j2') }}"
+        whitelist.conf: "{{ lookup('template', 'whitelist.conf.j2') }}"
+  register: graphite_cm_result
+  when: graphite_cm_result_existing.resources | length == 0
+
+- name: Verify Graphite-StatsD ConfigMap
+  community.kubernetes.k8s_info:
+    kind: ConfigMap
+    api_version: v1
+    name: "{{ graphite_statsd_cm_name }}"
+    namespace: '{{ namespace }}'
+  register: graphite_statsd_cm_result_existing
+
+- name: Create default Graphite-StatsD ConfigMap
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    force: "no"
+    namespace: "{{ namespace }}"
+    definition: "{{ lookup('template', 'graphite-statsd-configmap.yaml.j2') | from_yaml }}"
+  register: graphite_statsd_cm_result
+  when: graphite_statsd_cm_result_existing.resources | length == 0
+
+- name: Create graphite-carbon-node Service
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    namespace: "{{ namespace }}"
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: "{{ graphite_carbon_node_svc_name }}"
+        labels:
+          app.kubernetes.io/name: graphite
+          app.kubernetes.io/instance: graphite-carbon-node
+      spec:
+        type: ClusterIP
+        ports:
+          - name: graphite-pickle
+            port: "{{ graphite_node_port_pickle }}"
+            protocol: "{{ graphite_node_port_pickle_proto }}"
+          - name: graphite-line
+            port: "{{ graphite_node_port_line }}"
+            protocol: "TCP"
+          - name: graphite-udp
+            port: "{{ graphite_node_port_line }}"
+            protocol: "UDP"
+              #- name: graphite-gui
+              #  port: {{ .Values.service.port }}
+              #  protocol: TCP
+              #- name: aggregate-line
+              #  port: 2023
+              #  protocol: TCP
+              #- name: aggregate-pickl
+              #  port: 2024
+              #  protocol: TCP
+          - name: statsd
+            port: "{{ graphite_node_port_statsd }}"
+            protocol: "{{ graphite_node_port_statsd_proto }}"
+          - name: statsd-admin
+            port: "{{ graphite_node_port_statsd_admin }}"
+            protocol: "{{ graphite_node_port_statsd_admin_proto }}"
+        selector:
+          app.kubernetes.io/name: graphite
+          app.kubernetes.io/instance: graphite-carbon-node
+
+- name: Create graphite-carbon-relay Service
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    namespace: "{{ namespace }}"
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: "{{ graphite_carbon_relay_svc_name }}"
+        labels:
+          app.kubernetes.io/name: graphite
+          app.kubernetes.io/instance: graphite-carbon-relay
+      spec:
+        type: ClusterIP
+        ports:
+          - name: graphite-pickle
+            port: "{{ graphite_node_port_pickle }}"
+            protocol: "{{ graphite_node_port_pickle_proto }}"
+          - name: graphite-line
+            port: "{{ graphite_node_port_line }}"
+            protocol: "TCP"
+          - name: graphite-udp
+            port: "{{ graphite_node_port_line }}"
+            protocol: "UDP"
+          - name: graphite-gui
+            port: 80
+            protocol: TCP
+          - name: aggregate-line
+            port: 2023
+            protocol: TCP
+          - name: aggregate-pickl
+            port: 2024
+            protocol: TCP
+          - name: statsd
+            port: "{{ graphite_node_port_statsd }}"
+            protocol: "{{ graphite_node_port_statsd_proto }}"
+          - name: statsd-admin
+            port: "{{ graphite_node_port_statsd_admin }}"
+            protocol: "{{ graphite_node_port_statsd_admin_proto }}"
+        selector:
+          app.kubernetes.io/name: graphite
+          app.kubernetes.io/instance: graphite-carbon-relay
+
+# refetch CMs to get their version
+- name: Fetch graphite ConfigMap
+  community.kubernetes.k8s_info:
+    kind: ConfigMap
+    api_version: v1
+    name: "{{ graphite_cm_name }}"
+    namespace: '{{ namespace }}'
+  register: graphite_cm_result
+
+- name: Fetch graphite-statsd ConfigMap
+  community.kubernetes.k8s_info:
+    kind: ConfigMap
+    api_version: v1
+    name: "{{ graphite_statsd_cm_name }}"
+    namespace: '{{ namespace }}'
+  register: graphite_statsd_cm_result
+
+- name: Create graphite-carbon-node StatefulSet
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    namespace: "{{ namespace }}"
+    force: "yes"
+    definition:
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: graphite-carbon-node
+        labels:
+          app.kubernetes.io/name: graphite
+          app.kubernetes.io/instance: graphite-carbon-node
+      spec:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                    - key: "app.kubernetes.io/name"
+                      operator: In
+                      values:
+                      - graphite
+                    - key: "app.kubernetes.io/instance"
+                      operator: In
+                      values:
+                        - graphite-carbon-node
+                topologyKey: "kubernetes.io/hostname"
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: graphite
+            app.kubernetes.io/instance: graphite-carbon-node
+        serviceName: "{{ graphite_carbon_node_svc_name }}"
+        replicas: "{{ graphite_node_count }}"
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: graphite
+              app.kubernetes.io/instance: graphite-carbon-node
+            annotations:
+              carbon_config_version: "{{ graphite_cm_result['resources'][0]['metadata']['resourceVersion'] }}"
+              statsd_config_version: "{{ graphite_statsd_cm_result['resources'][0]['metadata']['resourceVersion'] }}"
+          spec:
+            terminationGracePeriodSeconds: 30
+            containers:
+              - resources: "{{ graphite_carbon_node_resources | default(omit) }}"
+                readinessProbe:
+                  httpGet:
+                    path: /
+                    port: graphite-gui
+                    scheme: HTTP
+                  timeoutSeconds: 1
+                  periodSeconds: 10
+                  successThreshold: 1
+                  failureThreshold: 3
+                terminationMessagePath: /dev/termination-log
+                name: graphite
+                livenessProbe:
+                  httpGet:
+                    path: /
+                    port: graphite-gui
+                    scheme: HTTP
+                  timeoutSeconds: 1
+                  periodSeconds: 10
+                  successThreshold: 1
+                  failureThreshold: 3
+                env:
+                  #- name: STATSD_INTERFACE
+                  #  value: "{{ graphite_node_port_statsd_proto | lower}}"
+                  - name: GRAPHITE_TIME_ZONE
+                    value: "{{ graphite_timezone }}"
+                  - name: GOCARBON
+                    value: "1"
+                  - name: REDIS_TAGDB
+                    value: "0"
+                securityContext:
+                  privileged: true
+                ports:
+                  - name: graphite-gui
+                    containerPort: 8080
+                    protocol: TCP
+                  - name: graphite-line
+                    containerPort: "{{ graphite_node_port_line }}"
+                    protocol: TCP
+                  - name: graphite-udp
+                    containerPort: "{{ graphite_node_port_line }}"
+                    protocol: UDP
+                  - name: graphite-pickle
+                    containerPort: "{{ graphite_node_port_pickle }}"
+                    protocol: TCP
+                  - name: aggregate-line
+                    containerPort: 2023
+                    protocol: TCP
+                  - name: aggregate-pickl
+                    containerPort: 2024
+                    protocol: TCP
+                  - name: statsd
+                    containerPort: "{{ graphite_node_port_statsd }}"
+                    protocol: UDP
+                  - name: statsd-admin
+                    containerPort: "{{ graphite_node_port_statsd_admin }}"
+                    protocol: TCP
+                imagePullPolicy: IfNotPresent
+                volumeMounts:
+                  - name: graphite-configmap
+                    mountPath: /opt/graphite/conf/
+                  - name: graphite-statsd-configmap
+                    mountPath: /opt/statsd/config/tcp.js
+                    subPath: config_tcp.js
+                  - name: graphite-statsd-configmap
+                    mountPath: /opt/statsd/config/udp.js
+                    subPath: config_udp.js
+                  - name: graphite-pvc
+                    mountPath: /opt/graphite/storage/
+                      #- name: graphite-configmap
+                      #  mountPath: /etc/go-carbon/go-carbon.conf
+                      #  subPath: go-carbon.conf
+                terminationMessagePolicy: File
+                serviceAccount: deployer
+                image: "{{ graphite_carbon_node_image }}"
+            volumes:
+              - name: graphite-configmap
+                configMap:
+                  name: "{{ graphite_cm_name }}"
+                  defaultMode: 420
+              - name: graphite-statsd-configmap
+                configMap:
+                  name: "{{ graphite_statsd_cm_name }}"
+                  defaultMode: 420
+            dnsPolicy: ClusterFirst
+            serviceAccount: "{{ graphite_service_account | default(omit) }}"
+        volumeClaimTemplates:
+          - metadata:
+              name: graphite-pvc
+            spec:
+              accessModes: "{{ graphite_node_pvc_access_mode }}"
+              storageClassName: "{{ graphite_node_pvc_storage_class_name }}"
+              resources:
+                requests:
+                  storage: "{{ graphite_node_pvc_size }}"
+
+- name: Build cluster hosts
+  set_fact:
+    graphite_cluster_hosts: "{{ (graphite_cluster_hosts | default([])) + [(graphite_carbon_node_svc_name + '-' + (item|string) + '.' + graphite_carbon_node_svc_name + '.' + namespace + '.svc.cluster.local:80') ] }}"
+  loop: "{{ range(0, graphite_node_count) | list }}"
+
+- name: Create graphite-relay-node StatefulSet
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    namespace: "{{ namespace }}"
+    force: "yes"
+    definition:
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: graphite-carbon-relay
+        labels:
+          app.kubernetes.io/name: graphite
+          app.kubernetes.io/instance: graphite-carbon-relay
+      spec:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                    - key: "app.kubernetes.io/name"
+                      operator: In
+                      values:
+                      - graphite
+                    - key: "app.kubernetes.io/instance"
+                      operator: In
+                      values:
+                        - graphite-carbon-relay
+                topologyKey: "kubernetes.io/hostname"
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: graphite
+            app.kubernetes.io/instance: graphite-carbon-relay
+        serviceName: "{{ graphite_carbon_relay_svc_name }}"
+        replicas: "{{ graphite_relay_count }}"
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: graphite
+              app.kubernetes.io/instance: graphite-carbon-relay
+            annotations:
+              carbon_config_version: "{{ graphite_cm_result['resources'][0]['metadata']['resourceVersion'] }}"
+              statsd_config_version: "{{ graphite_statsd_cm_result['resources'][0]['metadata']['resourceVersion'] }}"
+          spec:
+            terminationGracePeriodSeconds: 30
+            containers:
+              - resources: "{{ graphite_carbon_relay_resources | default(omit) }}"
+                readinessProbe:
+                  httpGet:
+                    path: /
+                    port: graphite-gui
+                    scheme: HTTP
+                  timeoutSeconds: 1
+                  periodSeconds: 10
+                  successThreshold: 1
+                  failureThreshold: 3
+                terminationMessagePath: /dev/termination-log
+                name: graphite
+                livenessProbe:
+                  httpGet:
+                    path: /
+                    port: graphite-gui
+                    scheme: HTTP
+                  timeoutSeconds: 1
+                  periodSeconds: 10
+                  successThreshold: 1
+                  failureThreshold: 3
+                env:
+                  - name: STATSD_INTERFACE
+                    value: "{{ graphite_node_port_statsd_proto | lower}}"
+                  - name: RELAY
+                    value: "1"
+                  - name: GRAPHITE_TIME_ZONE
+                    value: "{{ graphite_timezone }}"
+                  - name: REDIS_TAGDB
+                    value: "0"
+                  - name: GRAPHITE_CLUSTER_SERVERS
+                    value: "{{ graphite_cluster_hosts | join(',') }}"
+                securityContext:
+                  privileged: true
+                ports:
+                  - name: graphite-gui
+                    containerPort: 8080
+                    protocol: TCP
+                  - name: graphite-line
+                    containerPort: "{{ graphite_node_port_line }}"
+                    protocol: TCP
+                  - name: graphite-udp
+                    containerPort: "{{ graphite_node_port_line }}"
+                    protocol: UDP
+                  - name: graphite-pickle
+                    containerPort: "{{ graphite_node_port_pickle }}"
+                    protocol: TCP
+                  - name: aggregate-line
+                    containerPort: 2023
+                    protocol: TCP
+                  - name: aggregate-pickl
+                    containerPort: 2024
+                    protocol: TCP
+                  - name: statsd
+                    containerPort: "{{ graphite_node_port_statsd }}"
+                    protocol: UDP
+                  - name: statsd-admin
+                    containerPort: "{{ graphite_node_port_statsd_admin }}"
+                    protocol: TCP
+                imagePullPolicy: IfNotPresent
+                volumeMounts:
+                  - name: graphite-configmap
+                    mountPath: /opt/graphite/conf/
+                  - name: graphite-statsd-configmap
+                    mountPath: /opt/statsd/config/tcp.js
+                    subPath: config_tcp.js
+                  - name: graphite-statsd-configmap
+                    mountPath: /opt/statsd/config/udp.js
+                    subPath: config_udp.js
+                      #- name: graphite-configmap
+                      #  mountPath: /etc/go-carbon/go-carbon.conf
+                      #  subPath: go-carbon.conf
+                terminationMessagePolicy: File
+                serviceAccount: deployer
+                image: "{{ graphite_carbon_node_image }}"
+            volumes:
+              - name: graphite-configmap
+                configMap:
+                  name: "{{ graphite_cm_name }}"
+                  defaultMode: 420
+              - name: graphite-statsd-configmap
+                configMap:
+                  name: "{{ graphite_statsd_cm_name }}"
+                  defaultMode: 420
+            dnsPolicy: ClusterFirst
+            serviceAccount: "{{ graphite_service_account | default(omit) }}"
+
+- name: Manage Ingress
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    namespace: "{{ namespace }}"
+    definition: "{{ lookup('template', 'graphite-ingress.yaml.j2') | from_yaml }}"
+  when: graphite_ingress_host is defined

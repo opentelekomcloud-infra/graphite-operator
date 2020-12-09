@@ -1,0 +1,50 @@
+---
+# defaults file for Graphite
+ansible_operator_meta:
+  namespace: graphite
+
+state: present
+graphite_timezone: Europe/Berlin
+graphite_image: "graphiteapp/graphite-statsd:1.1.7-8"
+graphite_carbon_node_image: "{{ graphite_image }}"
+
+graphite_cm_name: "graphite-configmap"
+graphite_relay_cm_name: "graphite-relay-configmap"
+graphite_statsd_cm_name: "graphite-statsd-configmap"
+graphite_carbon_node_svc_name: "graphite-carbon-node"
+graphite_carbon_relay_svc_name: "graphite-carbon-relay"
+graphite_carbon_node_ss_name: "graphite-carbon-node"
+graphite_service_account: "deployer"
+
+graphite_node_count: 1
+graphite_relay_count: 1
+
+graphite_node_use_gocarbon: true
+graphite_node_pvc_access_mode: ["ReadWriteOnce"]
+graphite_node_pvc_storage_class_name: "local-storage"
+graphite_node_pvc_size: "10Gi"
+
+graphite_node_port_pickle: 2004
+graphite_node_port_pickle_proto: "TCP"
+graphite_port_line: 2003
+graphite_node_port_line: 2003
+  #"{{ graphite_port_plain }}"
+graphite_node_port_statsd: 8125
+graphite_node_port_statsd_proto: UDP
+graphite_node_port_statsd_admin: 8126
+graphite_node_port_statsd_admin_proto: TCP
+
+graphite_relay_port_pickle: 2014
+graphite_relay_port_line: 2013
+graphite_relay_replication_factor: 1
+graphite_relay_normalize_tag: true
+
+graphite_carbon_node_resources:
+  limits:
+    cpu: 500m
+    memory: 1024Mi
+  requests:
+    cpu: 200m
+    memory: 512Mi
+
+graphite_carbon_relay_resources: "{{ graphite_carbon_node_resources }}"

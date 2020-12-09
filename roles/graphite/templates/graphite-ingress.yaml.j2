@@ -1,0 +1,26 @@
+kind: Ingress
+apiVersion: networking.k8s.io/v1beta1
+metadata:
+  labels:
+    app.kubernetes.io/name: graphite
+ 
+{% if graphite_ingress_tls_letsencrypt_issuer %}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ graphite_ingress_tls_letsencrypt_issuer }}
+{% endif %}
+  name: graphite-ingress
+spec:
+{% if graphite_ingress_tls %}
+  tls:
+    - hosts:
+        - {{ graphite_ingress_host }}
+      secretName: {{ graphite_ingress_tls_secret_name }}
+{% endif %}
+  rules:
+    - host: {{ graphite_ingress_host }}
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: graphite-carbon-relay
+              servicePort: 80

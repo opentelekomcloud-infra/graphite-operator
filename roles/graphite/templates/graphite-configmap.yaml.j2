@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ graphite_cm_name }}
+data:
+  storage-aggregation.conf: |-
+   
+  carbon.conf: |-
+  carbon.amqp.conf: |-
+
+  aggregation-rules.conf: |-
+  graphTemplates.conf: |-
+
+  whitelist.conf: |-
+
+  blacklist.conf: |-
+   
+  relay-rules.conf: |-
+  rewrite-rules.conf: |-
+  graphite.wsgi.example: |-
+   
+  dashboard.conf: |-
+
+  go-carbon.conf: |-
+

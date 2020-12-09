@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ graphite_statsd_cm_name }}
+data:
+  config_tcp.js: |-
+    {
+      "graphiteHost": "127.0.0.1",
+      "graphitePort": {{ graphite_relay_port_line }},
+      "graphitePicklePort": {{ graphite_relay_port_pickle }},
+      "graphiteProtocol": "pickle",
+      "port": 8125,
+      "flushInterval": 10000,
+      "servers": [{
+        "server": "./servers/tcp",
+        "address": "0.0.0.0",
+        "port": 8125
+      }]
+    }
+  config_udp.js: |-
+    {
+      "graphiteHost": "127.0.0.1",
+      "graphitePort": {{ graphite_relay_port_line }},
+      "graphitePicklePort": {{ graphite_relay_port_pickle }},
+      "graphiteProtocol": "pickle",
+      "port": 8125,
+      "flushInterval": 10000,
+      "servers": [{
+        "server": "./servers/udp",
+        "address": "0.0.0.0",
+        "port": 8125
+      }]
+    }

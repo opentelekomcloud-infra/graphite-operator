@@ -1,0 +1,8 @@
+domain: otc.com
+layout: ansible.sdk.operatorframework.io/v1
+projectName: graphite-operator
+resources:
+- group: database
+  kind: Graphite
+  version: v1
+version: 3-alpha
