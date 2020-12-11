@@ -434,7 +434,11 @@ TAG_RELAY_NORMALIZED = {{ graphite_relay_normalize_tag }}
 #
 # If using RELAY_METHOD = rules, all destinations used in relay-rules.conf
 # must be defined in this list
-DESTINATIONS = {% for i in range(0, graphite_node_count) %}{{graphite_carbon_node_svc_name}}-{{i}}.{{graphite_carbon_node_svc_name}}.{{ansible_operator_meta.namespace}}.svc.cluster.local:{{graphite_node_port_pickle}} {% endfor %} 
+{% if graphite_relay_enable_aggregation %}
+DESTINATIONS = 127.0.0.1:{{ graphite_aggregator_port_pickle }}
+{% else %}
+DESTINATIONS = {% for i in range(0, graphite_node_count) %}{{ graphite_carbon_node_svc_name }}-{{ i }}.{{ graphite_carbon_node_svc_name }}.{{ graphite_namespace }}.svc.cluster.local:{{ graphite_node_port_pickle }} {% endfor %} 
+{% endif %}
 
 # This define the protocol to use to contact the destination. It can be
 # set to one of "line", "pickle", "udp" and "protobuf". This list can be
@@ -611,11 +615,12 @@ FORWARD_ALL = True
 # Note that if the destinations are all carbon-caches then this should
 # exactly match the webapp's CARBONLINK_HOSTS setting in terms of
 # instances listed (order matters!).
-DESTINATIONS = 127.0.0.1:2004
+#DESTINATIONS = 127.0.0.1:2004
+DESTINATIONS = {% for i in range(0, graphite_node_count) %}{{ graphite_carbon_node_svc_name }}-{{ i }}.{{ graphite_carbon_node_svc_name }}.{{ graphite_namespace }}.svc.cluster.local:{{ graphite_node_port_pickle }} {% endfor %} 
 
 # If you want to add redundancy to your data by replicating every
 # datapoint to more than one machine, increase this.
-REPLICATION_FACTOR = 1
+REPLICATION_FACTOR = {{ graphite_aggregator_replication_factor }}
 
 # This is the maximum number of datapoints that can be queued up
 # for a single destination. Once this limit is hit, we will

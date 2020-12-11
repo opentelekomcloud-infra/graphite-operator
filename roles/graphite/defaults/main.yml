@@ -25,10 +25,7 @@ graphite_node_pvc_storage_class_name: "local-storage"
 graphite_node_pvc_size: "10Gi"
 
 graphite_node_port_pickle: 2004
-graphite_node_port_pickle_proto: "TCP"
-graphite_port_line: 2003
 graphite_node_port_line: 2003
-  #"{{ graphite_port_plain }}"
 graphite_node_port_statsd: 8125
 graphite_node_port_statsd_proto: UDP
 graphite_node_port_statsd_admin: 8126
@@ -38,6 +35,10 @@ graphite_relay_port_pickle: 2014
 graphite_relay_port_line: 2013
 graphite_relay_replication_factor: 1
 graphite_relay_normalize_tag: true
+graphite_relay_enable_aggregation: false
+
+graphite_aggregator_port_pickle: 2024
+graphite_aggregator_replication_factor: 1
 
 graphite_carbon_node_resources:
   limits:
@@ -48,3 +49,7 @@ graphite_carbon_node_resources:
     memory: 512Mi
 
 graphite_carbon_relay_resources: "{{ graphite_carbon_node_resources }}"
+
+graphite_carbon_storage_stats_retentions: "10s:6h,1m:6d,10m:1y"
+graphite_carbon_storage_default_retentions: "60s:1d,5m:30d,1h:3y"
+

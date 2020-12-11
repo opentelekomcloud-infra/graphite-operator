@@ -31,8 +31,8 @@ retentions = 60:90d
 
 [stats]
 pattern = ^stats.*
-retentions = 10s:6h,1m:6d,10m:1800d
+retentions = {{ graphite_carbon_storage_stats_retentions }}
 
 [default]
 pattern = .*
-retentions = 60s:1d,5m:30d,1h:3y
+retentions = {{ graphite_carbon_storage_default_retentions }}

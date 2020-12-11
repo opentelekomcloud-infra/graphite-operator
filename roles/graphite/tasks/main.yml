@@ -6,14 +6,14 @@
     kind: ConfigMap
     api_version: v1
     name: "{{ graphite_cm_name }}"
-    namespace: '{{ namespace }}'
+    namespace: '{{ graphite_namespace }}'
   register: graphite_cm_result_existing
 
 - name: Create default Graphite ConfigMap
   community.kubernetes.k8s:
     state: "{{ state }}"
     force: "no"
-    namespace: "{{ namespace }}"
+    namespace: "{{ graphite_namespace }}"
     definition: 
       apiVersion: v1
       kind: ConfigMap
@@ -34,29 +34,29 @@
         storage-schemas.conf: "{{ lookup('template', 'storage-schemas.conf.j2') }}"
         whitelist.conf: "{{ lookup('template', 'whitelist.conf.j2') }}"
   register: graphite_cm_result
-  when: graphite_cm_result_existing.resources | length == 0
+  when: graphite_cm_result_existing.resources | length == 0 or state == 'absent'
 
 - name: Verify Graphite-StatsD ConfigMap
   community.kubernetes.k8s_info:
     kind: ConfigMap
     api_version: v1
     name: "{{ graphite_statsd_cm_name }}"
-    namespace: '{{ namespace }}'
+    namespace: '{{ graphite_namespace }}'
   register: graphite_statsd_cm_result_existing
 
 - name: Create default Graphite-StatsD ConfigMap
   community.kubernetes.k8s:
     state: "{{ state }}"
     force: "no"
-    namespace: "{{ namespace }}"
+    namespace: "{{ graphite_namespace }}"
     definition: "{{ lookup('template', 'graphite-statsd-configmap.yaml.j2') | from_yaml }}"
   register: graphite_statsd_cm_result
-  when: graphite_statsd_cm_result_existing.resources | length == 0
+  when: graphite_statsd_cm_result_existing.resources | length == 0 or state == 'absent'
 
 - name: Create graphite-carbon-node Service
   community.kubernetes.k8s:
     state: "{{ state }}"
-    namespace: "{{ namespace }}"
+    namespace: "{{ graphite_namespace }}"
     definition:
       apiVersion: v1
       kind: Service
@@ -70,7 +70,7 @@
         ports:
           - name: graphite-pickle
             port: "{{ graphite_node_port_pickle }}"
-            protocol: "{{ graphite_node_port_pickle_proto }}"
+            protocol: "TCP"
           - name: graphite-line
             port: "{{ graphite_node_port_line }}"
             protocol: "TCP"
@@ -99,7 +99,7 @@
 - name: Create graphite-carbon-relay Service
   community.kubernetes.k8s:
     state: "{{ state }}"
-    namespace: "{{ namespace }}"
+    namespace: "{{ graphite_namespace }}"
     definition:
       apiVersion: v1
       kind: Service
@@ -113,7 +113,7 @@
         ports:
           - name: graphite-pickle
             port: "{{ graphite_node_port_pickle }}"
-            protocol: "{{ graphite_node_port_pickle_proto }}"
+            protocol: "TCP"
           - name: graphite-line
             port: "{{ graphite_node_port_line }}"
             protocol: "TCP"
@@ -145,7 +145,7 @@
     kind: ConfigMap
     api_version: v1
     name: "{{ graphite_cm_name }}"
-    namespace: '{{ namespace }}'
+    namespace: '{{ graphite_namespace }}'
   register: graphite_cm_result
 
 - name: Fetch graphite-statsd ConfigMap
@@ -153,13 +153,13 @@
     kind: ConfigMap
     api_version: v1
     name: "{{ graphite_statsd_cm_name }}"
-    namespace: '{{ namespace }}'
+    namespace: '{{ graphite_namespace }}'
   register: graphite_statsd_cm_result
 
 - name: Create graphite-carbon-node StatefulSet
   community.kubernetes.k8s:
     state: "{{ state }}"
-    namespace: "{{ namespace }}"
+    namespace: "{{ graphite_namespace }}"
     force: "yes"
     definition:
       apiVersion: apps/v1
@@ -227,7 +227,7 @@
                   #  value: "{{ graphite_node_port_statsd_proto | lower}}"
                   - name: GRAPHITE_TIME_ZONE
                     value: "{{ graphite_timezone }}"
-                  - name: GOCARBON
+                  - name: "{{ graphite_node_use_gocarbon | ternary('GOCARBON', 'PYTHONCARBON') }}"
                     value: "1"
                   - name: REDIS_TAGDB
                     value: "0"
@@ -270,9 +270,6 @@
                     subPath: config_udp.js
                   - name: graphite-pvc
                     mountPath: /opt/graphite/storage/
-                      #- name: graphite-configmap
-                      #  mountPath: /etc/go-carbon/go-carbon.conf
-                      #  subPath: go-carbon.conf
                 terminationMessagePolicy: File
                 serviceAccount: deployer
                 image: "{{ graphite_carbon_node_image }}"
@@ -299,13 +296,13 @@
 
 - name: Build cluster hosts
   set_fact:
-    graphite_cluster_hosts: "{{ (graphite_cluster_hosts | default([])) + [(graphite_carbon_node_svc_name + '-' + (item|string) + '.' + graphite_carbon_node_svc_name + '.' + namespace + '.svc.cluster.local:80') ] }}"
+    graphite_cluster_hosts: "{{ (graphite_cluster_hosts | default([])) + [(graphite_carbon_node_svc_name + '-' + (item|string) + '.' + graphite_carbon_node_svc_name + '.' + graphite_namespace + '.svc.cluster.local:80') ] }}"
   loop: "{{ range(0, graphite_node_count) | list }}"
 
 - name: Create graphite-relay-node StatefulSet
   community.kubernetes.k8s:
     state: "{{ state }}"
-    namespace: "{{ namespace }}"
+    namespace: "{{ graphite_namespace }}"
     force: "yes"
     definition:
       apiVersion: apps/v1
@@ -437,6 +434,6 @@
 - name: Manage Ingress
   community.kubernetes.k8s:
     state: "{{ state }}"
-    namespace: "{{ namespace }}"
+    namespace: "{{ graphite_namespace }}"
     definition: "{{ lookup('template', 'graphite-ingress.yaml.j2') | from_yaml }}"
   when: graphite_ingress_host is defined
