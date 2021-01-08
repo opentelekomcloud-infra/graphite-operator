@@ -36,6 +36,34 @@
   register: graphite_cm_result
   when: graphite_cm_result_existing.resources | length == 0 or state == 'absent'
 
+- name: Create default Graphite Web ConfigMap
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    force: "yes"
+    namespace: "{{ graphite_namespace }}"
+    definition: 
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: "{{ graphite_web_cm_name }}"
+      data:
+        graphite-statsd.conf: "{{ lookup('template', 'nginx-graphite-statsd.conf.j2') }}"
+
+- name: Create default Graphite Web ConfigMap
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    force: "yes"
+    namespace: "{{ graphite_namespace }}"
+    definition: 
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ graphite_web_secret_name }}"
+      data: 
+        auth: "{{ graphite_web_htpasswd | string | b64encode }}"
+      type: "Opaque"
+  when: graphite_web_htpasswd is defined
+
 - name: Verify Graphite-StatsD ConfigMap
   community.kubernetes.k8s_info:
     kind: ConfigMap
@@ -170,20 +198,6 @@
           app.kubernetes.io/name: graphite
           app.kubernetes.io/instance: graphite-carbon-node
       spec:
-        affinity:
-          podAntiAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              - labelSelector:
-                  matchExpressions:
-                    - key: "app.kubernetes.io/name"
-                      operator: In
-                      values:
-                      - graphite
-                    - key: "app.kubernetes.io/instance"
-                      operator: In
-                      values:
-                        - graphite-carbon-node
-                topologyKey: "kubernetes.io/hostname"
         selector:
           matchLabels:
             app.kubernetes.io/name: graphite
@@ -199,6 +213,20 @@
               carbon_config_version: "{{ graphite_cm_result['resources'][0]['metadata']['resourceVersion'] }}"
               statsd_config_version: "{{ graphite_statsd_cm_result['resources'][0]['metadata']['resourceVersion'] }}"
           spec:
+            affinity:
+              podAntiAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  - labelSelector:
+                      matchExpressions:
+                        - key: "app.kubernetes.io/name"
+                          operator: In
+                          values:
+                          - graphite
+                        - key: "app.kubernetes.io/instance"
+                          operator: In
+                          values:
+                            - graphite-carbon-node
+                    topologyKey: "kubernetes.io/hostname"
             terminationGracePeriodSeconds: 30
             containers:
               - resources: "{{ graphite_carbon_node_resources | default(omit) }}"
@@ -270,6 +298,8 @@
                     subPath: config_udp.js
                   - name: graphite-pvc
                     mountPath: /opt/graphite/storage/
+                  - name: graphite-web-configmap
+                    mountPath: /etc/nginx/sites-enabled/
                 terminationMessagePolicy: File
                 serviceAccount: deployer
                 image: "{{ graphite_carbon_node_image }}"
@@ -281,6 +311,10 @@
               - name: graphite-statsd-configmap
                 configMap:
                   name: "{{ graphite_statsd_cm_name }}"
+                  defaultMode: 420
+              - name: graphite-web-configmap
+                configMap:
+                  name: "{{ graphite_web_cm_name }}"
                   defaultMode: 420
             dnsPolicy: ClusterFirst
             serviceAccount: "{{ graphite_service_account | default(omit) }}"
@@ -313,20 +347,6 @@
           app.kubernetes.io/name: graphite
           app.kubernetes.io/instance: graphite-carbon-relay
       spec:
-        affinity:
-          podAntiAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              - labelSelector:
-                  matchExpressions:
-                    - key: "app.kubernetes.io/name"
-                      operator: In
-                      values:
-                      - graphite
-                    - key: "app.kubernetes.io/instance"
-                      operator: In
-                      values:
-                        - graphite-carbon-relay
-                topologyKey: "kubernetes.io/hostname"
         selector:
           matchLabels:
             app.kubernetes.io/name: graphite
@@ -342,6 +362,20 @@
               carbon_config_version: "{{ graphite_cm_result['resources'][0]['metadata']['resourceVersion'] }}"
               statsd_config_version: "{{ graphite_statsd_cm_result['resources'][0]['metadata']['resourceVersion'] }}"
           spec:
+            affinity:
+              podAntiAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  - labelSelector:
+                      matchExpressions:
+                        - key: "app.kubernetes.io/name"
+                          operator: In
+                          values:
+                          - graphite
+                        - key: "app.kubernetes.io/instance"
+                          operator: In
+                          values:
+                            - graphite-carbon-relay
+                    topologyKey: "kubernetes.io/hostname"
             terminationGracePeriodSeconds: 30
             containers:
               - resources: "{{ graphite_carbon_relay_resources | default(omit) }}"
@@ -413,6 +447,8 @@
                   - name: graphite-statsd-configmap
                     mountPath: /opt/statsd/config/udp.js
                     subPath: config_udp.js
+                  - name: graphite-web-configmap
+                    mountPath: /etc/nginx/sites-enabled/
                       #- name: graphite-configmap
                       #  mountPath: /etc/go-carbon/go-carbon.conf
                       #  subPath: go-carbon.conf
@@ -423,6 +459,10 @@
               - name: graphite-configmap
                 configMap:
                   name: "{{ graphite_cm_name }}"
+                  defaultMode: 420
+              - name: graphite-web-configmap
+                configMap:
+                  name: "{{ graphite_web_cm_name }}"
                   defaultMode: 420
               - name: graphite-statsd-configmap
                 configMap:

@@ -9,6 +9,8 @@ graphite_image: "graphiteapp/graphite-statsd:1.1.7-8"
 graphite_carbon_node_image: "{{ graphite_image }}"
 
 graphite_cm_name: "graphite-configmap"
+graphite_web_cm_name: "graphite-web-configmap"
+graphite_web_secret_name: "graphite-web-htpasswd-secret"
 graphite_relay_cm_name: "graphite-relay-configmap"
 graphite_statsd_cm_name: "graphite-statsd-configmap"
 graphite_carbon_node_svc_name: "graphite-carbon-node"

@@ -8,4 +8,5 @@
     name: finalizer.database.otc.com
     vars:
       state: absent
+  watchDependentResources: True
 # +kubebuilder:scaffold:watch

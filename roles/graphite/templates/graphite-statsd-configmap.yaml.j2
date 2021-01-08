@@ -9,6 +9,9 @@ data:
       "graphitePort": {{ graphite_relay_port_line }},
       "graphitePicklePort": {{ graphite_relay_port_pickle }},
       "graphiteProtocol": "pickle",
+      "graphite": {
+        "legacyNamespace": false,
+      },
       "port": 8125,
       "flushInterval": 10000,
       "servers": [{
@@ -23,6 +26,9 @@ data:
       "graphitePort": {{ graphite_relay_port_line }},
       "graphitePicklePort": {{ graphite_relay_port_pickle }},
       "graphiteProtocol": "pickle",
+      "graphite": {
+        "legacyNamespace": false,
+      },
       "port": 8125,
       "flushInterval": 10000,
       "servers": [{
