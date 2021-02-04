@@ -1,0 +1,152 @@
+---
+- name: Create graphite-carbon-node Service
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    namespace: "{{ graphite_namespace }}"
+    definition:
+      apiVersion: "v1"
+      kind: "Service"
+      metadata:
+        name: "{{ graphite_carbon_node_svc_name }}"
+        labels:
+          app.kubernetes.io/name: "graphite"
+          app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+          app.kubernetes.io/version: "{{ graphite_version }}"
+          app.kubernetes.io/managed-by: "operator"
+      spec:
+        type: "ClusterIP"
+        ports:
+          - name: "graphite-pickle"
+            port: "{{ graphite_carbon_node_port_pickle }}"
+            protocol: "TCP"
+          - name: "graphite-line"
+            port: "{{ graphite_carbon_node_port_line }}"
+            protocol: "TCP"
+          - name: "graphite-udp"
+            port: "{{ graphite_carbon_node_port_line }}"
+            protocol: "UDP"
+        selector:
+          app.kubernetes.io/name: "graphite"
+          app.kubernetes.io/component: "graphite-carbon-node"
+          app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+
+- name: Create graphite-carbon-node StatefulSet
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    namespace: "{{ graphite_namespace }}"
+    force: "yes"
+    definition:
+      apiVersion: "apps/v1"
+      kind: "StatefulSet"
+      metadata:
+        name: "{{ graphite_carbon_node_ss_name }}"
+        labels:
+          app.kubernetes.io/name: "graphite"
+          app.kubernetes.io/component: "graphite-carbon-node"
+          app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+          app.kubernetes.io/version: "{{ graphite_version }}"
+          app.kubernetes.io/managed-by: "operator"
+      spec:
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: "graphite"
+            app.kubernetes.io/component: "graphite-carbon-node"
+            app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+        serviceName: "{{ graphite_carbon_node_svc_name }}"
+        replicas: "{{ graphite_carbon_node_count }}"
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: "graphite"
+              app.kubernetes.io/component: "graphite-carbon-node"
+              app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+            annotations:
+          spec:
+            affinity:
+              podAntiAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  - weight: 100
+                    podAffinityTerm:
+                      labelSelector:
+                        matchExpressions:
+                          - key: "app.kubernetes.io/component"
+                            operator: In
+                            values:
+                              - "graphite-carbon-node"
+                          - key: "app.kubernetes.io/name"
+                            operator: In
+                            values:
+                              - "graphite"
+                          - key: "app.kubernetes.io/instance"
+                            operator: In
+                            values:
+                              - "graphite-{{ansible_operator_meta.name }}"
+                      topologyKey: "kubernetes.io/hostname"
+            terminationGracePeriodSeconds: 30
+            containers:
+              - resources: "{{ graphite_carbon_node_resources | default(omit) }}"
+                readinessProbe:
+                  tcpSocket:
+                    port: "graphite-pickle"
+                  timeoutSeconds: "{{ graphite_carbon_readiness_timeout }}"
+                  initialDelaySeconds: 10
+                livenessProbe:
+                  tcpSocket:
+                    port: "graphite-pickle"
+                  timeoutSeconds: "{{ graphite_carbon_liveness_timeout }}"
+                  initialDelaySeconds: 5
+                name: "carbon"
+                env:
+                  # Use carbonserver
+                  - name: "GRAPHITE_CLUSTER_SERVERS"
+                    value: "127.0.0.1:8000"
+                  - name: "GOCARBON"
+                    value: "1"
+                  - name: "CARBON_AGGREGATOR_DISABLED"
+                    value: "1"
+                  - name: "NGINX_DISABLED"
+                    value: "1"
+                  - name: "STATSD_DISABLED"
+                    value: "1"
+                  - name: "MEMCACHE_HOST"
+                    value: "{{ memcache_hosts | join(',') }}"
+                securityContext:
+                  privileged: true
+                ports:
+                  - name: "graphite-line"
+                    containerPort: "{{ graphite_carbon_node_port_line }}"
+                    protocol: "TCP"
+                  - name: "graphite-udp"
+                    containerPort: "{{ graphite_carbon_node_port_line }}"
+                    protocol: "UDP"
+                  - name: "graphite-pickle"
+                    containerPort: "{{ graphite_carbon_node_port_pickle }}"
+                    protocol: "TCP"
+                  - name: "web"
+                    containerPort: 80
+                    protocol: "TCP"
+                imagePullPolicy: "IfNotPresent"
+                volumeMounts:
+                  - name: "graphite-configmap"
+                    mountPath: "/etc/go-carbon/go-carbon.conf"
+                    subPath: "go-carbon.conf"
+                  - name: "graphite-configmap"
+                    mountPath: "/opt/graphite/conf"
+                  - name: "graphite-pvc"
+                    mountPath: "/opt/graphite/storage/"
+                image: "{{ graphite_carbon_node_image }}"
+            volumes:
+              - name: "graphite-configmap"
+                configMap:
+                  name: "{{ graphite_cm_name }}"
+                  defaultMode: 420
+            serviceAccount: "{{ graphite_service_account | default(omit) }}"
+        volumeClaimTemplates:
+          - metadata:
+              name: "graphite-pvc"
+            spec:
+              accessModes: "{{ graphite_carbon_node_pvc_access_mode }}"
+              storageClassName: "{{ graphite_carbon_node_pvc_storage_class_name }}"
+              resources:
+                requests:
+                  storage: "{{ graphite_carbon_node_pvc_size }}"

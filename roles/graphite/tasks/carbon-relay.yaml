@@ -1,0 +1,154 @@
+---
+- name: Create graphite-carbon-relay Service
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    namespace: "{{ graphite_namespace }}"
+    definition:
+      apiVersion: "v1"
+      kind: "Service"
+      metadata:
+        name: "{{ graphite_relay_svc_name }}"
+        labels:
+          app.kubernetes.io/name: "graphite"
+          app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+          app.kubernetes.io/version: "{{ graphite_version }}"
+          app.kubernetes.io/managed-by: "operator"
+      spec:
+        type: "ClusterIP"
+        ports:
+          - name: "relay-line"
+            port: "{{ graphite_relay_port_line }}"
+            protocol: "TCP"
+          - name: "relay-pickle"
+            port: "{{ graphite_relay_port_pickle }}"
+            protocol: "TCP"
+          - name: "statsd"
+            port: 8125
+            protocol: "UDP"
+        selector:
+          app.kubernetes.io/name: "graphite"
+          app.kubernetes.io/component: "graphite-carbon-relay"
+          app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+
+- name: Create graphite-relay-node StatefulSet
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    namespace: "{{ graphite_namespace }}"
+    force: "yes"
+    definition:
+      apiVersion: "apps/v1"
+      kind: "StatefulSet"
+      metadata:
+        name: "{{ graphite_relay_ss_name }}"
+        labels:
+          app.kubernetes.io/name: "graphite"
+          app.kubernetes.io/component: "graphite-carbon-relay"
+          app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+          app.kubernetes.io/version: "{{ graphite_version }}"
+          app.kubernetes.io/managed-by: "operator"
+      spec:
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: "graphite"
+            app.kubernetes.io/component: "graphite-carbon-relay"
+            app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+        serviceName: "{{ graphite_relay_svc_name }}"
+        replicas: "{{ graphite_relay_count }}"
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: "graphite"
+              app.kubernetes.io/component: "graphite-carbon-relay"
+              app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+          spec:
+            affinity:
+              podAntiAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  - weight: 100
+                    podAffinityTerm:
+                      labelSelector:
+                        matchExpressions:
+                          - key: "app.kubernetes.io/name"
+                            operator: In
+                            values:
+                              - "graphite"
+                          - key: "app.kubernetes.io/component"
+                            operator: In
+                            values:
+                              - "graphite-carbon-relay"
+                          - key: "app.kubernetes.io/instance"
+                            operator: In
+                            values:
+                              - "graphite-{{ansible_operator_meta.name }}"
+                      topologyKey: "kubernetes.io/hostname"
+            containers:
+              - resources: "{{ graphite_relay_resources | default(omit) }}"
+                readinessProbe:
+                  tcpSocket:
+                    port: "relay-pickl"
+                  timeoutSeconds: "{{ graphite_relay_readiness_timeout }}"
+                livenessProbe:
+                  tcpSocket:
+                    port: "relay-pickl"
+                  timeoutSeconds: "{{ graphite_relay_liveness_timeout }}"
+                name: "carbon-relay"
+                env:
+                  - name: "STATSD_INTERFACE"
+                    value: "udp"
+                  - name: "RELAY"
+                    value: "1"
+                  - name: "GRAPHITE_TIME_ZONE"
+                    value: "{{ graphite_timezone }}"
+                  - name: "REDIS_TAGDB"
+                    value: "0"
+                  - name: "CARBON_DISABLED"
+                    value: "1"
+                  - name: "GRAPHITE_DISABLED"
+                    value: "1"
+                  - name: "REDIS_DISABLED"
+                    value: "1"
+                securityContext:
+                  privileged: true
+                ports:
+                  - name: "graphite-gui"
+                    containerPort: 80
+                    protocol: "TCP"
+                  - name: "relay-line"
+                    containerPort: "{{ graphite_relay_port_line }}"
+                    protocol: "TCP"
+                  - name: "relay-pickl"
+                    containerPort: "{{ graphite_relay_port_pickle }}"
+                    protocol: "TCP"
+                  - name: "statsd"
+                    containerPort: 8125
+                    protocol: "UDP"
+                  - name: "statsd-admin"
+                    containerPort: 8126
+                    protocol: "TCP"
+                imagePullPolicy: "IfNotPresent"
+                volumeMounts:
+                  - name: "graphite-configmap"
+                    mountPath: "/opt/graphite/conf/"
+                  - name: "graphite-statsd-configmap"
+                    mountPath: "/opt/statsd/config/tcp.js"
+                    subPath: "config_tcp.js"
+                  - name: "graphite-statsd-configmap"
+                    mountPath: "/opt/statsd/config/udp.js"
+                    subPath: "config_udp.js"
+                  - name: "graphite-web-configmap"
+                    mountPath: "/etc/nginx/sites-enabled/"
+                image: "{{ graphite_image }}"
+            volumes:
+              - name: "graphite-configmap"
+                configMap:
+                  name: "{{ graphite_cm_name }}"
+                  defaultMode: 420
+              - name: "graphite-web-configmap"
+                configMap:
+                  name: "{{ graphite_web_cm_name }}"
+                  defaultMode: 420
+              - name: "graphite-statsd-configmap"
+                configMap:
+                  name: "{{ graphite_statsd_cm_name }}"
+                  defaultMode: 420
+            serviceAccount: "{{ graphite_service_account | default(omit) }}"

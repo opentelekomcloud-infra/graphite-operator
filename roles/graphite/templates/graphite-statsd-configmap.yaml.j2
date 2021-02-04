@@ -2,6 +2,11 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ graphite_statsd_cm_name }}
+  labels:
+    app.kubernetes.io/name: graphite
+    app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+    #app.kubernetes.io/managed-by: operator
+    app.kubernetes.io/version: "{{ graphite_version }}"
 data:
   config_tcp.js: |-
     {

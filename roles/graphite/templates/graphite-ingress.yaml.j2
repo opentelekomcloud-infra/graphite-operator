@@ -1,9 +1,12 @@
 kind: Ingress
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 metadata:
   labels:
     app.kubernetes.io/name: graphite
- 
+    app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+    #app.kubernetes.io/managed-by: operator
+    app.kubernetes.io/version: "{{ graphite_version }}"
+
 {% if graphite_ingress_tls_letsencrypt_issuer %}
   annotations:
     cert-manager.io/cluster-issuer: {{ graphite_ingress_tls_letsencrypt_issuer }}
@@ -13,6 +16,7 @@ metadata:
     nginx.ingress.kubernetes.io/auth-secret: {{ graphite_web_secret_name }}
     nginx.ingress.kubernetes.io/auth-realm: "Authentication Required - Graphite"
 {% endif %}
+
   name: graphite-ingress
 spec:
 {% if graphite_ingress_tls %}
@@ -26,6 +30,9 @@ spec:
       http:
         paths:
           - path: /
+            pathType: Prefix
             backend:
-              serviceName: graphite-carbon-relay
-              servicePort: 80
+              service:
+                name: {{ graphite_web_svc_name }}
+                port:
+                  number: 80

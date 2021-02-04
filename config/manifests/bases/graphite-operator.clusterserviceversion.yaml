@@ -6,7 +6,7 @@ metadata:
     capabilities: Basic Install
     operators.operatorframework.io/builder: operator-sdk-v1.2.0
     operators.operatorframework.io/project_layout: ansible.sdk.operatorframework.io/v1
-  name: graphite-operator.vX.Y.Z
+  name: graphite-operator.v0.0.2
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -33,10 +33,10 @@ spec:
   - graphiteapp
   links:
   - name: Graphite Operator
-    url: https://graphite-operator.domain
+    url: https://graphite-operator.eco.tsi-dev.otc-service.com
   maintainers:
-  - email: email1
-    name: name1
+  - email: artem.goncharov@t-systems.com
+    name: Artem Goncharov
   maturity: alpha
   provider:
     name: otc.com

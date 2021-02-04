@@ -1,5 +1,5 @@
 # Current Operator version
-VERSION ?= 0.0.1
+VERSION ?= 0.0.2
 # Default bundle image tag
 BUNDLE_IMG ?= controller-bundle:$(VERSION)
 # Options for 'bundle-build'
@@ -10,6 +10,7 @@ ifneq ($(origin DEFAULT_CHANNEL), undefined)
 BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
+IMG ?= quay.io/opentelekomcloud/graphite-operator
 
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest

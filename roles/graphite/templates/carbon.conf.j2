@@ -95,7 +95,7 @@ MIN_TIMESTAMP_RESOLUTION = 1
 # interface to 0.0.0.0 listens on all interfaces.  Port can be set to 0 to
 # disable this listener if it is not required.
 LINE_RECEIVER_INTERFACE = 0.0.0.0
-LINE_RECEIVER_PORT = {{ graphite_node_port_line }}
+LINE_RECEIVER_PORT = {{ graphite_carbon_node_port_line }}
 
 # Set this to True to enable the UDP listener. By default this is off
 # because it is very common to run multiple carbon daemons and managing
@@ -108,7 +108,7 @@ UDP_RECEIVER_PORT = 2003
 # 0.0.0.0 listens on all interfaces.  Port can be set to 0 to disable this
 # listener if it is not required.
 PICKLE_RECEIVER_INTERFACE = 0.0.0.0
-PICKLE_RECEIVER_PORT = {{ graphite_node_port_pickle }}
+PICKLE_RECEIVER_PORT = {{ graphite_carbon_node_port_pickle }}
 
 # Set the maximum length for a received pickle string (in bytes).
 # If the string length is bigger, the receiver will silently close connection.
@@ -434,10 +434,10 @@ TAG_RELAY_NORMALIZED = {{ graphite_relay_normalize_tag }}
 #
 # If using RELAY_METHOD = rules, all destinations used in relay-rules.conf
 # must be defined in this list
-{% if graphite_relay_enable_aggregation %}
-DESTINATIONS = 127.0.0.1:{{ graphite_aggregator_port_pickle }}
+{% if graphite_relay_destinations is defined %}
+DESTINATIONS = {{ graphite_relay_destinations }}
 {% else %}
-DESTINATIONS = {% for i in range(0, graphite_node_count) %}{{ graphite_carbon_node_svc_name }}-{{ i }}.{{ graphite_carbon_node_svc_name }}.{{ graphite_namespace }}.svc.cluster.local:{{ graphite_node_port_pickle }} {% endfor %} 
+DESTINATIONS = 127.0.0.1:{{ graphite_relay_destination_port }}
 {% endif %}
 
 # This define the protocol to use to contact the destination. It can be
@@ -616,7 +616,11 @@ FORWARD_ALL = True
 # exactly match the webapp's CARBONLINK_HOSTS setting in terms of
 # instances listed (order matters!).
 #DESTINATIONS = 127.0.0.1:2004
-DESTINATIONS = {% for i in range(0, graphite_node_count) %}{{ graphite_carbon_node_svc_name }}-{{ i }}.{{ graphite_carbon_node_svc_name }}.{{ graphite_namespace }}.svc.cluster.local:{{ graphite_node_port_pickle }} {% endfor %} 
+{% if graphite_aggregate_destinations is defined %}
+DESTINATIONS = {{ graphite_aggregate_destinations }}
+{% else %}
+DESTINATIONS = 127.0.0.1:2004
+{% endif %}
 
 # If you want to add redundancy to your data by replicating every
 # datapoint to more than one machine, increase this.

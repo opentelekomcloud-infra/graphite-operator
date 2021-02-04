@@ -1,0 +1,105 @@
+---
+- name: Create StatsD Service
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    namespace: "{{ graphite_namespace }}"
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: "{{ graphite_statsd_svc_name }}"
+        labels:
+          app.kubernetes.io/name: "graphite"
+          app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+          app.kubernetes.io/managed-by: "operator"
+          app.kubernetes.io/component: "statsd"
+      spec:
+        type: ClusterIP
+        ports:
+          - name: "statsd"
+            port: 8125
+            protocol: "{{ graphite_statsd_protocol }}"
+        selector:
+          app.kubernetes.io/name: "graphite"
+          app.kubernetes.io/component: "statsd"
+          app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+
+- name: Create StatsD StatefulSet
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    namespace: "{{ graphite_namespace }}"
+    force: "yes"
+    definition:
+      apiVersion: "apps/v1"
+      kind: "Deployment"
+      metadata:
+        name: "{{ graphite_statsd_ss_name }}"
+        labels:
+          app.kubernetes.io/name: "graphite"
+          app.kubernetes.io/component: "statsd"
+          app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+          app.kubernetes.io/managed-by: "operator"
+      spec:
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: "graphite"
+            app.kubernetes.io/component: "statsd"
+            app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+        serviceName: "{{ graphite_statsd_svc_name }}"
+        replicas: 1
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: "graphite"
+              app.kubernetes.io/component: "statsd"
+              app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+          spec:
+            affinity:
+              podAntiAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  - labelSelector:
+                      matchExpressions:
+                        - key: "app.kubernetes.io/name"
+                          operator: In
+                          values:
+                            - graphite
+                        - key: "app.kubernetes.io/component"
+                          operator: In
+                          values:
+                            - graphite-carbon-relay
+                        - key: "app.kubernetes.io/instance"
+                          operator: In
+                          values:
+                            - "graphite-{{ansible_operator_meta.name }}"
+                    topologyKey: "kubernetes.io/hostname"
+            containers:
+              - resources: "{{ graphite_statsd_resources | default(omit) }}"
+                readinessProbe:
+                  tcpSocket:
+                    port: "statsd-admin"
+                  timeoutSeconds: "{{ graphite_statsd_readiness_timeout }}"
+                  initialDelaySeconds: 5
+                livenessProbe:
+                  tcpSocket:
+                    port: "statsd-admin"
+                  timeoutSeconds: "{{ graphite_statsd_liveness_timeout }}"
+                  initialDelaySeconds: 5
+                name: "statsd"
+                ports:
+                  - name: "statsd"
+                    containerPort: 8125
+                    protocol: "{{ graphite_statsd_protocol }}"
+                  - name: "statsd-admin"
+                    containerPort: 8126
+                    protocol: "TCP"
+                imagePullPolicy: "IfNotPresent"
+                volumeMounts:
+                  - name: "graphite-statsd-configmap"
+                    mountPath: "/usr/src/app/config.js"
+                    subPath: "config_udp.js"
+                image: "{{ graphite_statsd_image }}"
+            volumes:
+              - name: "graphite-statsd-configmap"
+                configMap:
+                  name: "{{ graphite_statsd_cm_name }}"
+                  defaultMode: 420

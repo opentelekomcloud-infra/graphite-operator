@@ -1,0 +1,94 @@
+---
+- name: Create carbonapi Service
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    namespace: "{{ graphite_namespace }}"
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: "carbonapi-svc"
+        labels:
+          app.kubernetes.io/name: graphite
+          app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+          app.kubernetes.io/version: "{{ graphite_version }}"
+          app.kubernetes.io/managed-by: "operator"
+      spec:
+        type: ClusterIP
+        ports:
+          - name: carbpnapi
+            port: 8081
+            protocol: "TCP"
+        selector:
+          app.kubernetes.io/name: graphite
+          app.kubernetes.io/component: carbonapi
+          app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+
+- name: Create carbonapi deployment
+  community.kubernetes.k8s:
+    state: "{{ state }}"
+    namespace: "{{ graphite_namespace }}"
+    force: "yes"
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: carbonapi-deployment
+        labels:
+          app.kubernetes.io/name: graphite
+          app.kubernetes.io/component: carbonapi
+          app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+          app.kubernetes.io/version: "{{ graphite_version }}"
+          app.kubernetes.io/managed-by: "operator"
+      spec:
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: graphite
+            app.kubernetes.io/component: carbonapi
+            app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+        serviceName: "carbonapi-svc"
+        replicas: "{{ graphite_node_count }}"
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: graphite
+              app.kubernetes.io/component: carbonapi
+              app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
+            annotations:
+          spec:
+            terminationGracePeriodSeconds: 30
+            containers:
+              - resources: "{{ graphite_carbon_node_resources | default(omit) }}"
+                readinessProbe:
+                  tcpSocket:
+                    port: 8081
+                  timeoutSeconds: "{{ graphite_liveness_timeout }}"
+                  periodSeconds: 10
+                  successThreshold: 1
+                  failureThreshold: 3
+                terminationMessagePath: /dev/termination-log
+                name: carbonapi
+                livenessProbe:
+                  tcpSocket:
+                    port: 8081
+                  timeoutSeconds: "{{ graphite_liveness_timeout }}"
+                  periodSeconds: 10
+                  successThreshold: 1
+                  failureThreshold: 3
+                ports:
+                  - name: carbonapi
+                    containerPort: 8081
+                    protocol: "TCP"
+                imagePullPolicy: IfNotPresent
+                volumeMounts:
+                  - name: graphite-configmap
+                    mountPath: /etc/carbonapi.yml
+                    subPath: carbonapi.yml
+                image: "{{ graphite_carbonapi_image }}"
+
+            volumes:
+              - name: graphite-configmap
+                configMap:
+                  name: "{{ graphite_cm_name }}"
+                  defaultMode: 420
+            serviceAccount: "{{ graphite_service_account | default(omit) }}"

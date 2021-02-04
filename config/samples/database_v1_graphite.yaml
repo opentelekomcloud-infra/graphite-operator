@@ -3,12 +3,16 @@ kind: Graphite
 metadata:
   name: graphite
 spec:
-  namespace: graphite
-  graphite_image: "graphiteapp/graphite-statsd:1.1.7-8"
+  graphite_namespace: graphite
+  graphite_image: "graphiteapp/graphite-statsd:1.1.7-9"
   graphite_service_account: deployer
-  graphite_ingress_host: graphite.apps.osinfra.eco.tsi-dev.otc-service.com
-  graphite_ingress_tls_letsencrypt_issuer: letsencrypt-staging
+  graphite_ingress_host: graphite.example.com
+  graphite_ingress_tls_letsencrypt_issuer: letsencrypt-prod
   graphite_ingress_tls: true
   graphite_ingress_tls_secret_name: graphite-cert
-  graphite_ingress_annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+  graphite_timezone: Europe/Berlin
+  graphite_node_count: 1
+  graphite_relay_count: 1
+  graphite_relay_enable_aggregation: true
+  graphite_node_pvc_size: 10Gi
+  graphite_node_pvc_storage_class_name: "local-storage"
