@@ -36,7 +36,7 @@ graphite_carbon_node_resources:
     memory: 4G
   requests:
     cpu: 200m
-    memory: 512Mi
+    memory: 1G
 graphite_carbon_readiness_timeout: 5
 graphite_carbon_liveness_timeout: 5
 

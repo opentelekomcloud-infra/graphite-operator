@@ -3,11 +3,11 @@
   community.kubernetes.k8s:
     state: "{{ state }}"
     namespace: "{{ graphite_namespace }}"
+    name: "{{ graphite_memcached_svc_name }}"
+    api_version: "v1"
+    kind: "Service"
     definition:
-      apiVersion: "v1"
-      kind: "Service"
       metadata:
-        name: "{{ graphite_memcached_svc_name }}"
         labels:
           app.kubernetes.io/name: "graphite"
           app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
@@ -28,12 +28,12 @@
   community.kubernetes.k8s:
     state: "{{ state }}"
     namespace: "{{ graphite_namespace }}"
-    force: "yes"
+    name: "{{ graphite_memcached_ss_name }}"
+    api_version: "apps/v1"
+    kind: "StatefulSet"
+    apply: "yes"
     definition:
-      apiVersion: "apps/v1"
-      kind: "StatefulSet"
       metadata:
-        name: "{{ graphite_memcached_ss_name }}"
         labels:
           app.kubernetes.io/name: "graphite"
           app.kubernetes.io/component: "memcached"

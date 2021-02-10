@@ -16,9 +16,15 @@
       spec:
         type: ClusterIP
         ports:
-          - name: "statsd"
+          - name: "statsd-udp"
             port: 8125
-            protocol: "{{ graphite_statsd_protocol }}"
+            protocol: "UDP"
+          - name: "statsd-tcp"
+            port: 8125
+            protocol: "TCP"
+          - name: "statsd-admin"
+            port: 8126
+            protocol: "TCP"
         selector:
           app.kubernetes.io/name: "graphite"
           app.kubernetes.io/component: "statsd"
@@ -86,9 +92,12 @@
                   initialDelaySeconds: 5
                 name: "statsd"
                 ports:
-                  - name: "statsd"
+                  - name: "statsd-udp"
                     containerPort: 8125
-                    protocol: "{{ graphite_statsd_protocol }}"
+                    protocol: "UDP"
+                  - name: "statsd-tcp"
+                    containerPort: 8125
+                    protocol: "TCP"
                   - name: "statsd-admin"
                     containerPort: 8126
                     protocol: "TCP"
@@ -96,7 +105,7 @@
                 volumeMounts:
                   - name: "graphite-statsd-configmap"
                     mountPath: "/usr/src/app/config.js"
-                    subPath: "config_udp.js"
+                    subPath: "config_tcp.js"
                 image: "{{ graphite_statsd_image }}"
             volumes:
               - name: "graphite-statsd-configmap"

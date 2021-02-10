@@ -14,10 +14,10 @@
     - graphite_additional_relay_destinations|length > 0
 
 - set_fact:
-    cluster_hosts: "{{ cluster_hosts + additional_cluster_hosts }}"
+    cluster_hosts: "{{ cluster_hosts + graphite_additional_cluster_hosts }}"
   when:
-    - additional_cluster_hosts is defined
-    - additional_cluster_hosts|length > 0
+    - graphite_additional_cluster_hosts is defined
+    - graphite_additional_cluster_hosts|length > 0
 
 - set_fact:
     aggregate_destinations: "{{ (aggregate_destinations|default([])) + graphite_additional_aggregate_destinations }}"
@@ -32,8 +32,13 @@
 - set_fact:
     memcache_hosts: "{{ (memcache_hosts|default([])) + [([(graphite_memcached_ss_name + '-%0x'), graphite_memcached_svc_name, graphite_namespace, 'svc.cluster.local:11211']) |join('.')|format(item) ] }}"
   loop: "{{ range(0, graphite_memcached_count) | list }}"
-  when: 
-    - memcache_hosts is not defined
+  when:
+    - override_memcache_hosts is not defined
+
+- set_fact:
+    memcache_hosts: "{{ override_memcache_hosts }}"
+  when:
+    - override_memcache_hosts is defined
 
 - name: Verify graphite ConfigMap
   community.kubernetes.k8s_info:
@@ -47,13 +52,12 @@
 - name: Create default Graphite ConfigMap
   community.kubernetes.k8s:
     state: "{{ state }}"
-    force: "no"
     namespace: "{{ graphite_namespace }}"
+    name: "{{ graphite_cm_name }}"
+    kind: ConfigMap
+    api_version: v1
     definition: 
-      apiVersion: v1
-      kind: ConfigMap
       metadata:
-        name: "{{ graphite_cm_name }}"
         labels:
           app.kubernetes.io/name: graphite
           app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
@@ -81,11 +85,11 @@
     state: "{{ state }}"
     force: "yes"
     namespace: "{{ graphite_namespace }}"
+    name: "{{ graphite_web_cm_name }}"
+    kind: ConfigMap
+    api_version: v1
     definition: 
-      apiVersion: v1
-      kind: ConfigMap
       metadata:
-        name: "{{ graphite_web_cm_name }}"
         labels:
           app.kubernetes.io/name: graphite
           app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
@@ -93,26 +97,6 @@
           app.kubernetes.io/version: "{{ graphite_version }}"
       data:
         graphite-statsd.conf: "{{ lookup('template', 'nginx-graphite-statsd.conf.j2') }}"
-
-- name: Create default Graphite Web ConfigMap
-  community.kubernetes.k8s:
-    state: "{{ state }}"
-    force: "yes"
-    namespace: "{{ graphite_namespace }}"
-    definition: 
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: "{{ graphite_web_secret_name }}"
-        labels:
-          app.kubernetes.io/name: graphite
-          app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
-          app.kubernetes.io/managed-by: operator
-          app.kubernetes.io/version: "{{ graphite_version }}"
-      data: 
-        auth: "{{ graphite_web_htpasswd | string | b64encode }}"
-      type: "Opaque"
-  when: graphite_web_htpasswd is defined
 
 - name: Verify Graphite-StatsD ConfigMap
   community.kubernetes.k8s_info:

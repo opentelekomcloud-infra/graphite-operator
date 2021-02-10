@@ -3,11 +3,12 @@
   community.kubernetes.k8s:
     state: "{{ state }}"
     namespace: "{{ graphite_namespace }}"
+    name: "{{ graphite_carbon_node_svc_name }}"
+    kind: "Service"
+    api_version: "v1"
+    apply: "yes"
     definition:
-      apiVersion: "v1"
-      kind: "Service"
       metadata:
-        name: "{{ graphite_carbon_node_svc_name }}"
         labels:
           app.kubernetes.io/name: "graphite"
           app.kubernetes.io/instance: "graphite-{{ansible_operator_meta.name }}"
@@ -34,12 +35,12 @@
   community.kubernetes.k8s:
     state: "{{ state }}"
     namespace: "{{ graphite_namespace }}"
-    force: "yes"
+    name: "{{ graphite_carbon_node_ss_name }}"
+    kind: "StatefulSet"
+    api_version: "apps/v1"
+    apply: "yes"
     definition:
-      apiVersion: "apps/v1"
-      kind: "StatefulSet"
       metadata:
-        name: "{{ graphite_carbon_node_ss_name }}"
         labels:
           app.kubernetes.io/name: "graphite"
           app.kubernetes.io/component: "graphite-carbon-node"
