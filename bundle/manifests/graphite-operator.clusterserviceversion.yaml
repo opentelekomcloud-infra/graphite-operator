@@ -11,8 +11,8 @@ metadata:
             "name": "graphite"
           },
           "spec": {
-            "graphite_image": "graphiteapp/graphite-statsd:1.1.7-8",
-            "graphite_ingress_host": "graphite.apps.osinfra.eco.tsi-dev.otc-service.com",
+            "graphite_image": "graphiteapp/graphite-statsd:1.1.7-9",
+            "graphite_ingress_host": "graphite.example.com",
             "graphite_ingress_tls": true,
             "graphite_ingress_tls_letsencrypt_issuer": "letsencrypt-prod",
             "graphite_ingress_tls_secret_name": "graphite-cert",
@@ -28,9 +28,9 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.3.0
+    operators.operatorframework.io/builder: operator-sdk-v1.4.0
     operators.operatorframework.io/project_layout: ansible.sdk.operatorframework.io/v1
-  name: graphite-operator.v0.0.2
+  name: graphite-operator.v0.0.3
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -151,7 +151,7 @@ spec:
                 env:
                 - name: ANSIBLE_GATHERING
                   value: explicit
-                image: quay.io/opentelekomcloud/graphite-operator:stg
+                image: quay.io/opentelekomcloud/graphite-operator:0.0.3
                 name: manager
                 resources: {}
               terminationGracePeriodSeconds: 10
@@ -197,5 +197,5 @@ spec:
     name: Artem Goncharov
   maturity: alpha
   provider:
-    name: otc.com
-  version: 0.0.2
+    name: Open Telekom Cloud
+  version: 0.0.3
